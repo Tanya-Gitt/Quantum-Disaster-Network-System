@@ -1,0 +1,87 @@
+version: "3.9"
+
+services:
+  # --- MQTT Broker ---
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    container_name: qdn-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mqtt-broker/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    restart: unless-stopped
+
+  # --- Flask API + WebSocket backend ---
+  api:
+    build: ./api
+    container_name: qdn-api
+    ports:
+      - "5000:5000"
+    environment:
+      - MQTT_HOST=mqtt
+      - MQTT_PORT=1883
+      - FLASK_ENV=development
+    depends_on:
+      - mqtt
+    restart: unless-stopped
+
+  # --- AI Engine (LSTM + PPO routing) ---
+  ai-engine:
+    build: ./ai-engine
+    container_name: qdn-ai
+    ports:
+      - "5001:5001"
+    environment:
+      - MQTT_HOST=mqtt
+      - API_HOST=api
+    depends_on:
+      - mqtt
+      - api
+    restart: unless-stopped
+
+  # --- Post-Quantum Crypto service ---
+  pqc:
+    build: ./pqc
+    container_name: qdn-pqc
+    ports:
+      - "5002:5002"
+    restart: unless-stopped
+
+  # --- Mesh / Network Simulator ---
+  mesh-sim:
+    build: ./mesh-sim
+    container_name: qdn-mesh
+    ports:
+      - "5003:5003"
+    environment:
+      - MQTT_HOST=mqtt
+      - API_HOST=api
+    depends_on:
+      - mqtt
+    restart: unless-stopped
+
+  # --- Blockchain Authentication ---
+  blockchain:
+    build: ./blockchain
+    container_name: qdn-blockchain
+    ports:
+      - "5004:5004"
+    environment:
+      - MQTT_HOST=mqtt
+    depends_on:
+      - mqtt
+    restart: unless-stopped
+
+  # --- React Dashboard ---
+  dashboard:
+    build: ./dashboard
+    container_name: qdn-dashboard
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  mqtt-data:
