@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Dashboard build ──────────────────────────────────────────────────────────
+  dashboard:
+    name: Dashboard (React build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: dashboard/package.json
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build
+        run: npm run build
+        env:
+          CI: false          # treat warnings as warnings, not errors
+
+  # ── Python services syntax check ─────────────────────────────────────────────
+  python-lint:
+    name: Python syntax check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check syntax (api)
+        run: python -m py_compile api/app/topology.py api/app/routes.py api/app/events.py api/app/mqtt_client.py
+
+      - name: Check syntax (ai-engine)
+        run: python -m py_compile ai-engine/src/lstm_predictor.py ai-engine/src/mesh_env.py ai-engine/src/ppo_agent.py
+
+      - name: Check syntax (pqc)
+        run: python -m py_compile pqc/src/kyber_kem.py pqc/src/dilithium_sig.py
+
+      - name: Check syntax (blockchain)
+        run: python -m py_compile blockchain/src/ledger.py
+
+      - name: Check syntax (mesh-sim)
+        run: python -m py_compile mesh-sim/src/simulator.py
+
+  # ── Docker Compose validation ─────────────────────────────────────────────────
+  compose-validate:
+    name: docker-compose.yml validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose file
+        run: docker compose config --quiet
